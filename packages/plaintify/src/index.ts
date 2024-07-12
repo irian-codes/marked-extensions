@@ -33,7 +33,7 @@ export default function markedPlaintify(
       currentTableHeader.push(token.text)
     }
 
-    return token.text + '__CELL_PAD__'
+    return (token.text ?? '') + '__CELL_PAD__'
   }
 
   const tablerow: typeof Renderer.prototype.tablerow = token => {
