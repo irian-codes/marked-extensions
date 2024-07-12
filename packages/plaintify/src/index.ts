@@ -1,4 +1,11 @@
-import { MarkedExtension, Renderer, RendererObject, Tokens } from 'marked'
+import {
+  marked,
+  MarkedExtension,
+  Renderer,
+  RendererObject,
+  Token,
+  Tokens
+} from 'marked'
 
 /**
  * Options for configuring the markedPlaintify extension.
@@ -10,6 +17,31 @@ export type Options = RendererObject & {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [k: string]: (...args: any[]) => string | false
 }
+
+const blockLevelElements = [
+  'space',
+  'hr',
+  'heading',
+  'code',
+  'table',
+  'blockquote',
+  'list',
+  'html',
+  'paragraph'
+]
+
+const inlineElements = [
+  'escape',
+  'html',
+  'link',
+  'image',
+  'strong',
+  'em',
+  'codespan',
+  'br',
+  'del',
+  'text'
+]
 
 /**
  * A [marked](https://marked.js.org/) extension to convert Markdown to Plaintext.
@@ -29,11 +61,13 @@ export default function markedPlaintify(
     '\n' + token.text.trim()
 
   const tablecell: typeof Renderer.prototype.tablecell = token => {
+    const text = marked.Parser.parseInline(token.tokens)
+
     if (token.header) {
-      currentTableHeader.push(token.text)
+      currentTableHeader.push(text)
     }
 
-    return (token.text ?? '') + '__CELL_PAD__'
+    return (text ?? '') + '__CELL_PAD__'
   }
 
   const tablerow: typeof Renderer.prototype.tablerow = token => {
@@ -50,13 +84,33 @@ export default function markedPlaintify(
     return (token.text ?? '') + '\n\n'
   }
 
+  const parseTokens = (tokens: Token[]) => {
+    let result = ''
+
+    for (const t of tokens) {
+      if (inlineElements.includes(t.type)) {
+        result += marked.Parser.parseInline([t])
+      } else {
+        result += marked.Parser.parse([t])
+      }
+    }
+
+    return result
+  }
+
   Object.getOwnPropertyNames(Renderer.prototype).forEach(prop => {
     if (mdIgnores.includes(prop)) {
       // ignore certain Markdown elements
       plainTextRenderer[prop] = () => ''
     } else if (mdInlines.includes(prop)) {
       // preserve inline elements
-      plainTextRenderer[prop] = token => token.text
+      plainTextRenderer[prop] = token => {
+        if (token.tokens && token.tokens.length > 0) {
+          return parseTokens(token.tokens)
+        } else {
+          return token.text ?? ''
+        }
+      }
     } else if (mdEscapes.includes(prop)) {
       // escaped elements
       plainTextRenderer[prop] = token => escapeHTML(token.text) + '\n\n'
@@ -74,9 +128,6 @@ export default function markedPlaintify(
     } else if (prop === 'listitem') {
       // handle list items
       plainTextRenderer[prop] = listitem
-    } else if (prop === 'blockquote') {
-      // handle blockquote items
-      plainTextRenderer[prop] = token => token.text.trim() + '\n\n'
     } else if (prop === 'table') {
       // handle table elements
       plainTextRenderer[prop] = (token): string => {
@@ -124,7 +175,13 @@ export default function markedPlaintify(
       }
     } else {
       // handle other (often block-level) elements
-      plainTextRenderer[prop] = token => (token.text ?? '') + '\n\n'
+      plainTextRenderer[prop] = token => {
+        if (token.tokens && token.tokens.length > 0) {
+          return parseTokens(token.tokens) + '\n\n'
+        } else {
+          return (token.text ?? '') + '\n\n'
+        }
+      }
     }
   })
 
