@@ -82,6 +82,12 @@ export default function markedPlaintify(
       plainTextRenderer[prop] = (token): string => {
         currentTableHeader = []
 
+        // parsing headers
+        for (let j = 0; j < token.header.length; j++) {
+          tablecell(token.header[j])
+        }
+
+        // parsing rows
         let body = ''
         for (let j = 0; j < token.rows.length; j++) {
           const row = token.rows[j]
