@@ -1,12 +1,14 @@
 /// <reference types="vitest/globals" />
 
-import { readFileSync } from 'node:fs'
 import { marked } from 'marked'
+import { readFileSync } from 'node:fs'
 import markedPlaintify from '../src/index.js'
 
 it('should convert Markdown content to plain text', () => {
   const md = readFileSync('test/fixtures/base.md', 'utf8')
   const plaintext = marked.use({ gfm: true }, markedPlaintify()).parse(md)
+
+  console.log('Parsed: ', plaintext)
 
   expect(plaintext).toMatchInlineSnapshot(`
     "Heading 1

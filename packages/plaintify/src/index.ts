@@ -1,4 +1,4 @@
-import { Renderer, MarkedExtension, RendererObject } from 'marked'
+import { MarkedExtension, Renderer, RendererObject, Tokens } from 'marked'
 
 /**
  * Options for configuring the markedPlaintify extension.
@@ -24,60 +24,91 @@ export default function markedPlaintify(
 
   let currentTableHeader: string[] = []
 
+  // New Renderer functions
+  const listitem: typeof Renderer.prototype.listitem = token =>
+    '\n' + token.text.trim()
+
+  const tablecell: typeof Renderer.prototype.tablecell = token => {
+    if (token.header) {
+      currentTableHeader.push(token.text)
+    }
+
+    return token.text + '__CELL_PAD__'
+  }
+
+  const tablerow: typeof Renderer.prototype.tablerow = token => {
+    const chunks = token.text.split('__CELL_PAD__').filter(Boolean)
+
+    return (
+      currentTableHeader
+        .map((title, i) => title + ': ' + chunks[i])
+        .join('\n') + '\n\n'
+    )
+  }
+
   Object.getOwnPropertyNames(Renderer.prototype).forEach(prop => {
     if (mdIgnores.includes(prop)) {
       // ignore certain Markdown elements
       plainTextRenderer[prop] = () => ''
     } else if (mdInlines.includes(prop)) {
       // preserve inline elements
-      plainTextRenderer[prop] = text => text
+      plainTextRenderer[prop] = token => token.text
     } else if (mdEscapes.includes(prop)) {
       // escaped elements
-      plainTextRenderer[prop] = text => escapeHTML(text) + '\n\n'
+      plainTextRenderer[prop] = token => escapeHTML(token.text) + '\n\n'
     } else if (prop === 'list') {
       // handle list element
-      plainTextRenderer[prop] = text => '\n' + text.trim() + '\n\n'
+      plainTextRenderer[prop] = token => {
+        let body = ''
+        for (let j = 0; j < token.items.length; j++) {
+          const item = token.items[j]
+          body += listitem(item)
+        }
+
+        return '\n' + body.trim() + '\n\n'
+      }
     } else if (prop === 'listitem') {
       // handle list items
-      plainTextRenderer[prop] = text => '\n' + text.trim()
+      plainTextRenderer[prop] = listitem
     } else if (prop === 'blockquote') {
-      // handle list items
-      plainTextRenderer[prop] = text => text.trim() + '\n\n'
+      // handle blockquote items
+      plainTextRenderer[prop] = token => token.text.trim() + '\n\n'
     } else if (prop === 'table') {
       // handle table elements
-      plainTextRenderer[prop] = (_, body) => {
+      plainTextRenderer[prop] = (token): string => {
         currentTableHeader = []
+
+        let body = ''
+        for (let j = 0; j < token.rows.length; j++) {
+          const row = token.rows[j]
+          let cell = ''
+          for (let k = 0; k < row.length; k++) {
+            cell += tablecell(row[k])
+          }
+          body += tablerow({ text: cell })
+        }
+
         return body
       }
     } else if (prop === 'tablerow') {
       // handle table rows
-      plainTextRenderer[prop] = content => {
-        const chunks = content.split('__CELL_PAD__').filter(Boolean)
-
-        return (
-          currentTableHeader
-            .map((title, i) => title + ': ' + chunks[i])
-            .join('\n') + '\n\n'
-        )
-      }
+      plainTextRenderer[prop] = tablerow
     } else if (prop === 'tablecell') {
       // handle table cells
-      plainTextRenderer[prop] = (text, flags) => {
-        if (flags.header) {
-          currentTableHeader.push(text)
-        }
-        return text + '__CELL_PAD__'
-      }
+      plainTextRenderer[prop] = tablecell
     } else if (prop === 'link' || prop === 'image') {
       // handle links and images
-      plainTextRenderer[prop] = (_, __, text) => (!!text ? text : '')
+      plainTextRenderer[prop] = (token: Tokens.Link | Tokens.Image) => {
+        return token.text ?? ''
+      }
     } else {
       // handle other (often block-level) elements
-      plainTextRenderer[prop] = text => text + '\n\n'
+      plainTextRenderer[prop] = token => (token.text ?? '') + '\n\n'
     }
   })
 
   return {
+    useNewRenderer: true,
     renderer: {
       ...plainTextRenderer,
       ...options
