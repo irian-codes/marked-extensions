@@ -18,7 +18,7 @@ export default function markedPlaintify(
   options: Options = {}
 ): MarkedExtension {
   const plainTextRenderer: Options = {}
-  const mdIgnores: string[] = ['constructor', 'hr', 'checkbox', 'br']
+  const mdIgnores: string[] = ['constructor', 'hr', 'checkbox', 'br', 'space']
   const mdInlines: string[] = ['strong', 'em', 'codespan', 'del', 'text']
   const mdEscapes: string[] = ['html', 'code', 'codespan']
 
@@ -44,6 +44,10 @@ export default function markedPlaintify(
         .map((title, i) => title + ': ' + chunks[i])
         .join('\n') + '\n\n'
     )
+  }
+
+  const linkOrImage = (token: Tokens.Link | Tokens.Image | Tokens.Generic) => {
+    return (token.text ?? '') + '\n\n'
   }
 
   Object.getOwnPropertyNames(Renderer.prototype).forEach(prop => {
@@ -98,8 +102,19 @@ export default function markedPlaintify(
       plainTextRenderer[prop] = tablecell
     } else if (prop === 'link' || prop === 'image') {
       // handle links and images
-      plainTextRenderer[prop] = (token: Tokens.Link | Tokens.Image) => {
-        return token.text ?? ''
+      plainTextRenderer[prop] = linkOrImage
+    } else if (prop === 'paragraph') {
+      plainTextRenderer[prop] = token => {
+        const firstToken = token.tokens[0]
+
+        if (
+          firstToken &&
+          (firstToken.type === 'link' || firstToken.type === 'image')
+        ) {
+          return linkOrImage(firstToken)
+        } else {
+          return (token.text ?? '') + '\n\n'
+        }
       }
     } else {
       // handle other (often block-level) elements
