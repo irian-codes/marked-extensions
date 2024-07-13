@@ -60,44 +60,44 @@ export default function markedPlaintify(
 
   const space: typeof Renderer.prototype.space = () => ''
 
-  const code: Options['code'] = token => {
+  const code: typeof Renderer.prototype.code = token => {
     return escapeHTML(token.text) + '\n\n'
   }
 
-  const blockquote: Options['blockquote'] = token => {
+  const blockquote: typeof Renderer.prototype.blockquote = token => {
     const text = parser.parse(token.tokens)
     return text.trim() + '\n\n'
   }
 
-  const html: Options['html'] = token => {
+  const html: typeof Renderer.prototype.html = token => {
     return escapeHTML(token.text) + '\n\n'
   }
 
-  const heading: Options['heading'] = token => {
+  const heading: typeof Renderer.prototype.heading = token => {
     const text = parser.parseInline(token.tokens)
     return text + '\n\n'
   }
 
-  const hr: Options['hr'] = () => ''
+  const hr: typeof Renderer.prototype.hr = () => ''
 
-  const list: Options['list'] = token => {
+  const listitem: typeof Renderer.prototype.listitem = token => {
+    const text = parser.parse(token.tokens)
+    return '\n' + text.trim()
+  }
+
+  const list: typeof Renderer.prototype.list = token => {
     let text = ''
     for (let j = 0; j < token.items.length; j++) {
       const item = token.items[j]
-      text += listitem(item)
+      text += listitem(item).replace(/\n{2,}/g, '\n')
     }
 
     return '\n' + text.trim() + '\n\n'
   }
 
-  const listitem: Options['listitem'] = token => {
-    const text = parser.parse(token.tokens)
-    return '\n' + text.trim()
-  }
+  const checkbox: typeof Renderer.prototype.checkbox = () => ''
 
-  const checkbox: Options['checkbox'] = () => ''
-
-  const paragraph: Options['paragraph'] = token => {
+  const paragraph: typeof Renderer.prototype.paragraph = token => {
     let text = parser.parseInline(token.tokens)
 
     // Removing extra newlines introduced by other renderer functions
@@ -106,7 +106,27 @@ export default function markedPlaintify(
     return text + '\n\n'
   }
 
-  const table: Options['table'] = token => {
+  const tablecell: typeof Renderer.prototype.tablecell = token => {
+    const text = parser.parseInline(token.tokens)
+
+    if (token.header) {
+      currentTableHeader.push(text)
+    }
+
+    return (text ?? '') + '__CELL_PAD__'
+  }
+
+  const tablerow: typeof Renderer.prototype.tablerow = token => {
+    const chunks = token.text.split('__CELL_PAD__').filter(Boolean)
+
+    return (
+      currentTableHeader
+        .map((title, i) => title + ': ' + chunks[i])
+        .join('\n') + '\n\n'
+    )
+  }
+
+  const table: typeof Renderer.prototype.table = token => {
     currentTableHeader = []
 
     // parsing headers
@@ -128,55 +148,35 @@ export default function markedPlaintify(
     return body
   }
 
-  const tablerow: Options['tablerow'] = token => {
-    const chunks = token.text.split('__CELL_PAD__').filter(Boolean)
-
-    return (
-      currentTableHeader
-        .map((title, i) => title + ': ' + chunks[i])
-        .join('\n') + '\n\n'
-    )
-  }
-
-  const tablecell: Options['tablecell'] = token => {
-    const text = parser.parseInline(token.tokens)
-
-    if (token.header) {
-      currentTableHeader.push(text)
-    }
-
-    return (text ?? '') + '__CELL_PAD__'
-  }
-
-  const strong: Options['strong'] = token => {
+  const strong: typeof Renderer.prototype.strong = token => {
     const text = parser.parseInline(token.tokens)
     return text
   }
 
-  const em: Options['em'] = token => {
+  const em: typeof Renderer.prototype.em = token => {
     const text = parser.parseInline(token.tokens)
     return text
   }
 
-  const codespan: Options['codespan'] = token => token.text
+  const codespan: typeof Renderer.prototype.codespan = token => token.text
 
-  const br: Options['br'] = () => ''
+  const br: typeof Renderer.prototype.br = () => ''
 
-  const del: Options['del'] = token => {
+  const del: typeof Renderer.prototype.del = token => {
     const text = parser.parseInline(token.tokens)
     return text
   }
 
-  const link: Options['link'] = token => {
+  const link: typeof Renderer.prototype.link = token => {
     const text = parser.parseInline(token.tokens)
     return (text ?? '') + '\n\n'
   }
 
-  const image: Options['image'] = token => {
+  const image: typeof Renderer.prototype.image = token => {
     return (token.text ?? '') + '\n\n'
   }
 
-  const text: Options['text'] = token => token.text
+  const text: typeof Renderer.prototype.text = token => token.text
 
   const plainTextRenderer: Options = {
     space,
