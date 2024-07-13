@@ -3,9 +3,7 @@ import {
   Marked,
   MarkedExtension,
   Renderer,
-  RendererObject,
-  Token,
-  Tokens
+  RendererObject
 } from 'marked'
 
 /**
@@ -59,18 +57,74 @@ export default function markedPlaintify(
 
   let currentTableHeader: string[] = []
 
-  // New Renderer functions
-  const listitem: typeof Renderer.prototype.listitem = token =>
-    '\n' + token.text.trim()
+  // 1. Check next function in the new Marked Renderer
+  // 2. Check how to obtain the text
+  // 3. Output it in the format of the marked-plaintify extension
 
-  const tablecell: typeof Renderer.prototype.tablecell = token => {
+  const space: typeof Renderer.prototype.space = () => ''
+
+  const code: typeof Renderer.prototype.code = token => {
+    return escapeHTML(token.text) + '\n\n'
+  }
+
+  const blockquote: typeof Renderer.prototype.blockquote = token => {
+    const text = parser.parse(token.tokens)
+    return text.trim() + '\n\n'
+  }
+
+  const html: typeof Renderer.prototype.html = token => {
+    return escapeHTML(token.text) + '\n\n'
+  }
+
+  const heading: typeof Renderer.prototype.heading = token => {
     const text = parser.parseInline(token.tokens)
+    return text + '\n\n'
+  }
 
-    if (token.header) {
-      currentTableHeader.push(text)
+  const hr: typeof Renderer.prototype.hr = () => ''
+
+  const list: typeof Renderer.prototype.list = token => {
+    let text = ''
+    for (let j = 0; j < token.items.length; j++) {
+      const item = token.items[j]
+      text += listitem(item)
     }
 
-    return (text ?? '') + '__CELL_PAD__'
+    return '\n' + text.trim() + '\n\n'
+  }
+
+  const listitem: typeof Renderer.prototype.listitem = token => {
+    const text = parser.parse(token.tokens)
+    return '\n' + text.trim()
+  }
+
+  const checkbox: typeof Renderer.prototype.checkbox = () => ''
+
+  const paragraph: typeof Renderer.prototype.paragraph = token => {
+    const text = parser.parseInline(token.tokens)
+    return text + '\n\n'
+  }
+
+  const table: typeof Renderer.prototype.table = token => {
+    currentTableHeader = []
+
+    // parsing headers
+    for (let j = 0; j < token.header.length; j++) {
+      tablecell(token.header[j])
+    }
+
+    // parsing rows
+    let body = ''
+    for (let j = 0; j < token.rows.length; j++) {
+      const row = token.rows[j]
+      let cell = ''
+      for (let k = 0; k < row.length; k++) {
+        cell += tablecell(row[k])
+      }
+      body += tablerow({ text: cell })
+    }
+
+    return body
   }
 
   const tablerow: typeof Renderer.prototype.tablerow = token => {
@@ -83,25 +137,53 @@ export default function markedPlaintify(
     )
   }
 
-  const linkOrImage = (token: Tokens.Link | Tokens.Image | Tokens.Generic) => {
+  const tablecell: typeof Renderer.prototype.tablecell = token => {
+    const text = parser.parseInline(token.tokens)
+
+    if (token.header) {
+      currentTableHeader.push(text)
+    }
+
+    return (text ?? '') + '__CELL_PAD__'
+  }
+
+  const strong: typeof Renderer.prototype.strong = token => {
+    const text = parser.parseInline(token.tokens)
+    return text
+  }
+
+  const em: typeof Renderer.prototype.em = token => {
+    const text = parser.parseInline(token.tokens)
+    return text
+  }
+
+  const codespan: typeof Renderer.prototype.codespan = token => token.text
+
+  const br: typeof Renderer.prototype.br = () => ''
+
+  const del: typeof Renderer.prototype.del = token => {
+    const text = parser.parseInline(token.tokens)
+    return text
+  }
+
+  const link: typeof Renderer.prototype.link = token => {
+    const text = parser.parseInline(token.tokens)
     return (token.text ?? '') + '\n\n'
   }
 
-  const parseTokens = (tokens: Token[]) => {
-    let result = ''
-
-    for (const t of tokens) {
-      if (inlineElements.includes(t.type)) {
-        result += parser.parseInline([t])
-      } else {
-        result += parser.parse([t])
-      }
-    }
-
-    return result
+  const image: typeof Renderer.prototype.image = token => {
+    return (token.text ?? '') + '\n\n'
   }
 
+  const text: typeof Renderer.prototype.text = token => token.text
+
   Object.getOwnPropertyNames(Renderer.prototype).forEach(prop => {
+    if (prop === 'space') {
+      plainTextRenderer[prop] = space
+    }
+
+    // OLD CODE
+
     if (mdIgnores.includes(prop)) {
       // ignore certain Markdown elements
       plainTextRenderer[prop] = () => ''
