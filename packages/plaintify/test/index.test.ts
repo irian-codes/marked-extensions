@@ -8,8 +8,6 @@ it('should convert Markdown content to plain text', () => {
   const md = readFileSync('test/fixtures/base.md', 'utf8')
   const plaintext = marked.use({ gfm: true }, markedPlaintify(marked)).parse(md)
 
-  // console.log('Parsed 1: ', plaintext)
-
   expect(plaintext).toMatchInlineSnapshot(`
     "Heading 1
 
@@ -33,8 +31,6 @@ it('should convert Markdown content to plain text', () => {
 it('should handle complex Markdown content', () => {
   const md = readFileSync('test/fixtures/complex.md', 'utf8')
   const plaintext = marked.use({ gfm: true }, markedPlaintify(marked)).parse(md)
-
-  // console.log('Parsed 2: ', plaintext)
 
   expect(plaintext).toMatchInlineSnapshot(`
     "GitHub Flavored Markdown (GFM) Specifications Demo
