@@ -17,31 +17,6 @@ export type Options = RendererObject & {
   [k: string]: (...args: any[]) => string | false
 }
 
-const blockLevelElements = [
-  'space',
-  'hr',
-  'heading',
-  'code',
-  'table',
-  'blockquote',
-  'list',
-  'html',
-  'paragraph'
-]
-
-const inlineElements = [
-  'escape',
-  'html',
-  'link',
-  'image',
-  'strong',
-  'em',
-  'codespan',
-  'br',
-  'del',
-  'text'
-]
-
 /**
  * A [marked](https://marked.js.org/) extension to convert Markdown to Plaintext.
  */
@@ -201,17 +176,6 @@ export default function markedPlaintify(
     image,
     text
   }
-
-  // DEBUG
-  // for (const prop in plainTextRenderer) {
-  //   plainTextRenderer[prop] = printToken
-  // }
-
-  // function printToken(token: Tokens.Generic) {
-  //   const text = `type: ${token.type}, text: ${token.raw}`
-
-  //   return `\n${text}\n`
-  // }
 
   return {
     useNewRenderer: true,
