@@ -50,40 +50,37 @@ export default function markedPlaintify(
   options: Options = {}
 ): MarkedExtension {
   const parser = instance.Parser
-  const plainTextRenderer: Options = {}
   const mdIgnores: string[] = ['constructor', 'hr', 'checkbox', 'br', 'space']
   const mdInlines: string[] = ['strong', 'em', 'codespan', 'del', 'text']
   const mdEscapes: string[] = ['html', 'code', 'codespan']
 
   let currentTableHeader: string[] = []
 
-  // 1. Check next function in the new Marked Renderer
-  // 2. Check how to obtain the text
-  // 3. Output it in the format of the marked-plaintify extension
+  // Renderer functions
 
   const space: typeof Renderer.prototype.space = () => ''
 
-  const code: typeof Renderer.prototype.code = token => {
+  const code: Options['code'] = token => {
     return escapeHTML(token.text) + '\n\n'
   }
 
-  const blockquote: typeof Renderer.prototype.blockquote = token => {
+  const blockquote: Options['blockquote'] = token => {
     const text = parser.parse(token.tokens)
     return text.trim() + '\n\n'
   }
 
-  const html: typeof Renderer.prototype.html = token => {
+  const html: Options['html'] = token => {
     return escapeHTML(token.text) + '\n\n'
   }
 
-  const heading: typeof Renderer.prototype.heading = token => {
+  const heading: Options['heading'] = token => {
     const text = parser.parseInline(token.tokens)
     return text + '\n\n'
   }
 
-  const hr: typeof Renderer.prototype.hr = () => ''
+  const hr: Options['hr'] = () => ''
 
-  const list: typeof Renderer.prototype.list = token => {
+  const list: Options['list'] = token => {
     let text = ''
     for (let j = 0; j < token.items.length; j++) {
       const item = token.items[j]
@@ -93,19 +90,23 @@ export default function markedPlaintify(
     return '\n' + text.trim() + '\n\n'
   }
 
-  const listitem: typeof Renderer.prototype.listitem = token => {
+  const listitem: Options['listitem'] = token => {
     const text = parser.parse(token.tokens)
     return '\n' + text.trim()
   }
 
-  const checkbox: typeof Renderer.prototype.checkbox = () => ''
+  const checkbox: Options['checkbox'] = () => ''
 
-  const paragraph: typeof Renderer.prototype.paragraph = token => {
-    const text = parser.parseInline(token.tokens)
+  const paragraph: Options['paragraph'] = token => {
+    let text = parser.parseInline(token.tokens)
+
+    // Removing extra newlines introduced by other renderer functions
+    text = text.replace(/\n{2,}/g, '')
+
     return text + '\n\n'
   }
 
-  const table: typeof Renderer.prototype.table = token => {
+  const table: Options['table'] = token => {
     currentTableHeader = []
 
     // parsing headers
@@ -127,7 +128,7 @@ export default function markedPlaintify(
     return body
   }
 
-  const tablerow: typeof Renderer.prototype.tablerow = token => {
+  const tablerow: Options['tablerow'] = token => {
     const chunks = token.text.split('__CELL_PAD__').filter(Boolean)
 
     return (
@@ -137,7 +138,7 @@ export default function markedPlaintify(
     )
   }
 
-  const tablecell: typeof Renderer.prototype.tablecell = token => {
+  const tablecell: Options['tablecell'] = token => {
     const text = parser.parseInline(token.tokens)
 
     if (token.header) {
@@ -147,128 +148,70 @@ export default function markedPlaintify(
     return (text ?? '') + '__CELL_PAD__'
   }
 
-  const strong: typeof Renderer.prototype.strong = token => {
+  const strong: Options['strong'] = token => {
     const text = parser.parseInline(token.tokens)
     return text
   }
 
-  const em: typeof Renderer.prototype.em = token => {
+  const em: Options['em'] = token => {
     const text = parser.parseInline(token.tokens)
     return text
   }
 
-  const codespan: typeof Renderer.prototype.codespan = token => token.text
+  const codespan: Options['codespan'] = token => token.text
 
-  const br: typeof Renderer.prototype.br = () => ''
+  const br: Options['br'] = () => ''
 
-  const del: typeof Renderer.prototype.del = token => {
+  const del: Options['del'] = token => {
     const text = parser.parseInline(token.tokens)
     return text
   }
 
-  const link: typeof Renderer.prototype.link = token => {
+  const link: Options['link'] = token => {
     const text = parser.parseInline(token.tokens)
+    return (text ?? '') + '\n\n'
+  }
+
+  const image: Options['image'] = token => {
     return (token.text ?? '') + '\n\n'
   }
 
-  const image: typeof Renderer.prototype.image = token => {
-    return (token.text ?? '') + '\n\n'
+  const text: Options['text'] = token => token.text
+
+  const plainTextRenderer: Options = {
+    space,
+    code,
+    blockquote,
+    html,
+    heading,
+    hr,
+    list,
+    listitem,
+    checkbox,
+    paragraph,
+    table,
+    tablerow,
+    tablecell,
+    strong,
+    em,
+    codespan,
+    br,
+    del,
+    link,
+    image,
+    text
   }
 
-  const text: typeof Renderer.prototype.text = token => token.text
+  // DEBUG
+  // for (const prop in plainTextRenderer) {
+  //   plainTextRenderer[prop] = printToken
+  // }
 
-  Object.getOwnPropertyNames(Renderer.prototype).forEach(prop => {
-    if (prop === 'space') {
-      plainTextRenderer[prop] = space
-    }
+  // function printToken(token: Tokens.Generic) {
+  //   const text = `type: ${token.type}, text: ${token.raw}`
 
-    // OLD CODE
-
-    if (mdIgnores.includes(prop)) {
-      // ignore certain Markdown elements
-      plainTextRenderer[prop] = () => ''
-    } else if (mdInlines.includes(prop)) {
-      // preserve inline elements
-      plainTextRenderer[prop] = token => {
-        if (token.tokens && token.tokens.length > 0) {
-          return parseTokens(token.tokens)
-        } else {
-          return token.text ?? ''
-        }
-      }
-    } else if (mdEscapes.includes(prop)) {
-      // escaped elements
-      plainTextRenderer[prop] = token => escapeHTML(token.text) + '\n\n'
-    } else if (prop === 'list') {
-      // handle list element
-      plainTextRenderer[prop] = token => {
-        let body = ''
-        for (let j = 0; j < token.items.length; j++) {
-          const item = token.items[j]
-          body += listitem(item)
-        }
-
-        return '\n' + body.trim() + '\n\n'
-      }
-    } else if (prop === 'listitem') {
-      // handle list items
-      plainTextRenderer[prop] = listitem
-    } else if (prop === 'table') {
-      // handle table elements
-      plainTextRenderer[prop] = (token): string => {
-        currentTableHeader = []
-
-        // parsing headers
-        for (let j = 0; j < token.header.length; j++) {
-          tablecell(token.header[j])
-        }
-
-        // parsing rows
-        let body = ''
-        for (let j = 0; j < token.rows.length; j++) {
-          const row = token.rows[j]
-          let cell = ''
-          for (let k = 0; k < row.length; k++) {
-            cell += tablecell(row[k])
-          }
-          body += tablerow({ text: cell })
-        }
-
-        return body
-      }
-    } else if (prop === 'tablerow') {
-      // handle table rows
-      plainTextRenderer[prop] = tablerow
-    } else if (prop === 'tablecell') {
-      // handle table cells
-      plainTextRenderer[prop] = tablecell
-    } else if (prop === 'link' || prop === 'image') {
-      // handle links and images
-      plainTextRenderer[prop] = linkOrImage
-    } else if (prop === 'paragraph') {
-      plainTextRenderer[prop] = token => {
-        const firstToken = token.tokens[0]
-
-        if (
-          firstToken &&
-          (firstToken.type === 'link' || firstToken.type === 'image')
-        ) {
-          return linkOrImage(firstToken)
-        } else {
-          return (token.text ?? '') + '\n\n'
-        }
-      }
-    } else {
-      // handle other (often block-level) elements
-      plainTextRenderer[prop] = token => {
-        if (token.tokens && token.tokens.length > 0) {
-          return parseTokens(token.tokens) + '\n\n'
-        } else {
-          return (token.text ?? '') + '\n\n'
-        }
-      }
-    }
-  })
+  //   return `\n${text}\n`
+  // }
 
   return {
     useNewRenderer: true,
