@@ -1,5 +1,6 @@
 import {
   marked,
+  Marked,
   MarkedExtension,
   Renderer,
   RendererObject,
@@ -47,8 +48,10 @@ const inlineElements = [
  * A [marked](https://marked.js.org/) extension to convert Markdown to Plaintext.
  */
 export default function markedPlaintify(
+  instance: Marked | typeof marked,
   options: Options = {}
 ): MarkedExtension {
+  const parser = instance.Parser
   const plainTextRenderer: Options = {}
   const mdIgnores: string[] = ['constructor', 'hr', 'checkbox', 'br', 'space']
   const mdInlines: string[] = ['strong', 'em', 'codespan', 'del', 'text']
@@ -61,7 +64,7 @@ export default function markedPlaintify(
     '\n' + token.text.trim()
 
   const tablecell: typeof Renderer.prototype.tablecell = token => {
-    const text = marked.Parser.parseInline(token.tokens)
+    const text = parser.parseInline(token.tokens)
 
     if (token.header) {
       currentTableHeader.push(text)
@@ -89,9 +92,9 @@ export default function markedPlaintify(
 
     for (const t of tokens) {
       if (inlineElements.includes(t.type)) {
-        result += marked.Parser.parseInline([t])
+        result += parser.parseInline([t])
       } else {
-        result += marked.Parser.parse([t])
+        result += parser.parse([t])
       }
     }
 
