@@ -14,7 +14,7 @@ export type Options = RendererObject & {
    * Custom 3rd-party renderers.
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [k: string]: (...args: any[]) => string | false
+  [k: string]: (this: Renderer, ...args: any[]) => string | false
 }
 
 /**
@@ -36,7 +36,7 @@ export default function markedPlaintify(
       plainTextRenderer[prop] = () => ''
     } else if (mdInlines.includes(prop)) {
       // preserve inline elements
-      plainTextRenderer[prop] = function (this: Renderer, token) {
+      plainTextRenderer[prop] = function (token) {
         const text = this.parser.parseInline(token.tokens)
         return text
       }
