@@ -36,7 +36,7 @@ export default function markedPlaintify(
       plainTextRenderer[prop] = () => ''
     } else if (mdInlines.includes(prop)) {
       // preserve inline elements
-      plainTextRenderer[prop] = function (token) {
+      plainTextRenderer[prop] = function (this: Renderer, token) {
         const text = this.parser.parseInline(token.tokens)
         return text
       }
