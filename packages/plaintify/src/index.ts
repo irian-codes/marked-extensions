@@ -21,10 +21,8 @@ export type Options = RendererObject & {
  * A [marked](https://marked.js.org/) extension to convert Markdown to Plaintext.
  */
 export default function markedPlaintify(
-  instance: Marked | typeof marked,
   options: Options = {}
 ): MarkedExtension {
-  const parser = instance.Parser
   const plainTextRenderer: Options = {}
   const mdIgnores: string[] = ['constructor', 'hr', 'checkbox ', 'br', 'space']
   const mdInlines: string[] = ['strong', 'em', 'del']
@@ -38,8 +36,8 @@ export default function markedPlaintify(
       plainTextRenderer[prop] = () => ''
     } else if (mdInlines.includes(prop)) {
       // preserve inline elements
-      plainTextRenderer[prop] = token => {
-        const text = parser.parseInline(token.tokens)
+      plainTextRenderer[prop] = function (token) {
+        const text = this.parser.parseInline(token.tokens)
         return text
       }
     } else if (mdEscapes.includes(prop)) {
@@ -50,41 +48,39 @@ export default function markedPlaintify(
       plainTextRenderer[prop] = token => escapeHTML(token.text)
     } else if (prop === 'list') {
       // handle list element
-      plainTextRenderer[prop] = token => {
+      plainTextRenderer[prop] = function (token) {
         let text = ''
         for (let j = 0; j < token.items.length; j++) {
           const item = token.items[j]
-          // @ts-expect-error In my opinion, 'listitem' will ever be
-          // undefined nor the 'this' issue has any implications. We're
-          // declaring functions and passing them to Marked for later use.
-          // When the function is executed this object will have everything
-          // it needs to work well.
-          text += plainTextRenderer.listitem(item).replace(/\n{2,}/g, '\n')
+          const renderedItem = this.listitem(item)
+
+          if (typeof renderedItem === 'string') {
+            text += renderedItem.replace(/\n{2,}/g, '\n')
+          }
         }
 
         return '\n' + text.trim() + '\n\n'
       }
     } else if (prop === 'listitem') {
       // handle list items
-      plainTextRenderer[prop] = token => {
-        const text = parser.parse(token.tokens)
+      plainTextRenderer[prop] = function (token) {
+        const text = this.parser.parse(token.tokens)
         return '\n' + text.trim()
       }
     } else if (prop === 'blockquote') {
       // handle blockquote
-      plainTextRenderer[prop] = token => {
-        const text = parser.parse(token.tokens)
+      plainTextRenderer[prop] = function (token) {
+        const text = this.parser.parse(token.tokens)
         return text.trim() + '\n\n'
       }
     } else if (prop === 'table') {
       // handle table elements
-      plainTextRenderer[prop] = token => {
+      plainTextRenderer[prop] = function (token) {
         currentTableHeader = []
 
         // parsing headers
         for (let j = 0; j < token.header.length; j++) {
-          // @ts-expect-error See 'list' function error
-          plainTextRenderer.tablecell(token.header[j])
+          this.tablecell(token.header[j])
         }
 
         // parsing rows
@@ -93,11 +89,9 @@ export default function markedPlaintify(
           const row = token.rows[j]
           let cell = ''
           for (let k = 0; k < row.length; k++) {
-            // @ts-expect-error See 'list' function error
-            cell += plainTextRenderer.tablecell(row[k])
+            cell += this.tablecell(row[k])
           }
-          // @ts-expect-error See 'list' function error
-          body += plainTextRenderer.tablerow({ text: cell })
+          body += this.tablerow({ text: cell })
         }
 
         return body
@@ -115,8 +109,8 @@ export default function markedPlaintify(
       }
     } else if (prop === 'tablecell') {
       // handle table cells
-      plainTextRenderer[prop] = token => {
-        const text = parser.parseInline(token.tokens)
+      plainTextRenderer[prop] = function (token) {
+        const text = this.parser.parseInline(token.tokens)
 
         if (token.header) {
           currentTableHeader.push(text)
@@ -126,8 +120,8 @@ export default function markedPlaintify(
       }
     } else if (prop === 'link') {
       // handle links
-      plainTextRenderer[prop] = token => {
-        const text = parser.parseInline(token.tokens)
+      plainTextRenderer[prop] = function (token) {
+        const text = this.parser.parseInline(token.tokens)
         return text + '\n\n'
       }
     } else if (prop === 'image') {
@@ -137,8 +131,8 @@ export default function markedPlaintify(
       }
     } else if (prop === 'paragraph') {
       // handle paragraphs (which sometimes link and images lines are detected as well)
-      plainTextRenderer[prop] = token => {
-        let text = parser.parseInline(token.tokens)
+      plainTextRenderer[prop] = function (token) {
+        let text = this.parser.parseInline(token.tokens)
 
         // Removing extra newlines introduced by other renderer functions
         text = text.replace(/\n{2,}/g, '')
@@ -147,15 +141,15 @@ export default function markedPlaintify(
       }
     } else if (prop === 'heading') {
       // handle headings
-      plainTextRenderer[prop] = token => {
-        const text = parser.parseInline(token.tokens)
+      plainTextRenderer[prop] = function (token) {
+        const text = this.parser.parseInline(token.tokens)
         return text + '\n\n'
       }
     } else {
       // handle other elements
-      plainTextRenderer[prop] = token => {
+      plainTextRenderer[prop] = function (token) {
         return 'tokens' in token && token.tokens
-          ? parser.parseInline(token.tokens)
+          ? this.parser.parseInline(token.tokens)
           : token.text
       }
     }
