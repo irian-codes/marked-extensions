@@ -1,10 +1,4 @@
-import {
-  Renderer,
-  MarkedExtension,
-  RendererObject,
-  Marked,
-  marked
-} from 'marked'
+import { Renderer, MarkedExtension, RendererObject } from 'marked'
 
 /**
  * Options for configuring the markedPlaintify extension.
